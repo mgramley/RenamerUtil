@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(dotnet test *)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(dotnet publish *)",
+      "Bash(dotnet pack *)",
+      "Read(//var/home/michael.gramley/.local/bin/**)",
+      "Bash(rm ~/.local/bin/renamer)",
+      "Bash(dotnet tool *)",
+      "Read(//home/michael.gramley/.dotnet/tools/**)",
+      "Bash(renamer --help)"
     ]
   }
 }

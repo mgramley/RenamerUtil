@@ -9,10 +9,34 @@ A small cross-platform .NET 10 console exe (`RenamerUtil`) for batch-renaming fi
 ## Build & test
 
 - `dotnet build` — builds both projects
-- `dotnet test` — runs the xunit suite (~40 tests, sub-second)
+- `dotnet test` — runs the xunit suite (~43 tests, sub-second)
 - `dotnet run --project RenamerUtil -- <args>` — run the CLI without leaving the repo
-- The standalone binary lands at `RenamerUtil/bin/Debug/net10.0/RenamerUtil` and runs directly (a `runtimeconfig.json` is emitted alongside it)
-- For a single redistributable file: `dotnet publish RenamerUtil -c Release -r linux-x64 --self-contained`
+- The standalone binary lands at `RenamerUtil/bin/Debug/net10.0/RenamerUtil` and runs directly
+
+## Packaging & install
+
+The csproj is set up so `dotnet pack` produces a global tool, while `dotnet publish` with the AOT flag produces a native binary. Pick whichever fits the target machine.
+
+**Desktop / dev box (.NET runtime already installed) — global tool, ~78KB:**
+
+```
+dotnet pack RenamerUtil -c Release
+dotnet tool install -g --add-source RenamerUtil/bin/Release RenamerUtil
+# upgrade later: rebuild + `dotnet tool update -g --add-source ... RenamerUtil`
+```
+
+Lands at `~/.dotnet/tools/renamer`. Runs as `renamer <command> ...` from anywhere. Requires the .NET 10 runtime at run time.
+
+**NAS / portable / no-runtime target — Native AOT binary, ~1.8MB:**
+
+```
+dotnet publish RenamerUtil -c Release -r linux-x64 -p:PublishAot=true
+# scp RenamerUtil/bin/Release/net10.0/linux-x64/publish/RenamerUtil <target>:~/bin/renamer
+```
+
+Standalone ELF (dynamically linked against glibc only). For other platforms swap `-r` for `linux-arm64`, `osx-arm64`, etc. The .NET 10 SDK ships its own AOT toolchain (`ilc`), so no system `clang` is needed. Don't ship the `.dbg` file alongside it — that's debug symbols.
+
+The two packaging models are mutually exclusive within a single artifact: `PackAsTool` produces an IL-based nupkg, AOT produces a native binary. The csproj keeps `PackAsTool` set unconditionally because it's inert during build/publish; the AOT flag is opt-in via the `-p:` switch.
 
 ## Runtime model (read this before changing rename logic)
 
@@ -44,7 +68,7 @@ Global flags: `-n` / `--dry-run` (preview), `-h` / `--help` (usage). Unknown com
 `Renamer.cs` has two static fields that drive how the *original* filename gets cleaned before it's used (in `tv --keep` mode as a suffix, and to remove the prefix from any `tv` output):
 
 - `BadChars` — string array of single-character substrings stripped via repeated `string.Replace`. Includes `0-9`, so any year/number in a source filename gets removed. This is the first place to look when `tv --keep` produces a wrong-looking suffix.
-- `BadStrings` — a single `Regex` matching `season`, `episode`, and the `480p` / `720p` / `1080p` / `2160p` resolution tags, optionally bracketed (`[1080p]`), case-insensitive. To add a new scrub token (e.g. `BluRay`, `WEB-DL`, `x264`), extend this regex's alternation.
+- `BadStrings` — a source-generated `Regex` (via `[GeneratedRegex]` partial method, AOT-safe) matching `season`, `episode`, and the `480p` / `720p` / `1080p` / `2160p` resolution tags, optionally bracketed (`[1080p]`), case-insensitive. To add a new scrub token (e.g. `BluRay`, `WEB-DL`, `x264`), extend this regex's alternation. Because it's source-generated, the class is declared `partial`.
 
 These only run inside `ScrubForTv` (called from `FormatTvName`). Movie mode (`FormatMovieName`) does no scrubbing — the user passes the title verbatim.
 

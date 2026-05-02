@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace RenamerUtil;
 
-public class Renamer(string directory, bool dryRun = false, TextWriter? output = null)
+public partial class Renamer(string directory, bool dryRun = false, TextWriter? output = null)
 {
     private static readonly string[] BadChars =
     [
@@ -11,9 +11,8 @@ public class Renamer(string directory, bool dryRun = false, TextWriter? output =
         "(", ")", "'", "."
     ];
 
-    private static readonly Regex BadStrings = new(
-        @"\[?(?:season|episode|480p?|720p?|1080p?|2160p?)\]?",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    [GeneratedRegex(@"\[?(?:season|episode|480p?|720p?|1080p?|2160p?)\]?", RegexOptions.IgnoreCase)]
+    private static partial Regex BadStrings();
 
     private readonly TextWriter _out = output ?? Console.Out;
 
@@ -123,7 +122,7 @@ public class Renamer(string directory, bool dryRun = false, TextWriter? output =
 
     public static string ScrubForTv(string name)
     {
-        var s = BadStrings.Replace(name, string.Empty);
+        var s = BadStrings().Replace(name, string.Empty);
         s = BadChars.Aggregate(s, (acc, c) => acc.Replace(c, string.Empty));
         return s.Trim();
     }
