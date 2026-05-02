@@ -2,15 +2,20 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RenamerUtil
 {
     public class Renamer
     {
-        private List<string> _badChars = new List<string>() { "@", "#", "$", "%", "_", "-", "*", "%", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "(", ")", "'", "."};
-        private List<string> _badStrings = new List<string>() { "season", "Season", "episdoe", "Episode", "[1080p]", "[1080P]", "1080P", "1080p", "1080", "[720p]", "[720P]", "720P", "720p", "720", "[480p]", "[480P]", "480P", "480p", "480" };
+        private readonly List<string> _badChars =
+        [
+            "@", "#", "$", "%", "_", "-", "*", "%", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "(", ")", "'", "."
+        ];
+        private readonly List<string> _badStrings =
+        [
+            "season", "Season", "episode", "Episode", "[1080p]", "[1080P]", "1080P", "1080p", "1080", "[720p]",
+            "[720P]", "720P", "720p", "720", "[480p]", "[480P]", "480P", "480p", "480"
+        ];
 
         public void PrintFileNames()
         {
