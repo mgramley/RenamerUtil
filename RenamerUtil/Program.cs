@@ -4,90 +4,96 @@ return Run(args);
 
 static int Run(string[] args)
 {
-    if (args.Length == 0 || args[0] is "-h" or "--help")
+    if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
     {
         PrintUsage();
         return 0;
     }
 
     var dryRun = false;
-    var rest = new List<string>(args.Length);
+    var positional = new List<string>(args.Length);
     foreach (var a in args)
     {
         if (a is "-n" or "--dry-run")
         {
             dryRun = true;
         }
+        else if (a is "-h" or "--help")
+        {
+            PrintUsage();
+            return 0;
+        }
         else
         {
-            rest.Add(a);
+            positional.Add(a);
         }
     }
 
-    if (rest.Count == 0)
+    if (positional.Count == 0)
     {
         PrintUsage();
         return 0;
     }
 
     var renamer = new Renamer(Directory.GetCurrentDirectory(), dryRun);
-    var cmd = rest[0];
+    var cmd = positional[0];
+    var rest = positional.Skip(1).ToList();
 
     try
     {
         switch (cmd)
         {
-            case "-t":
+            case "list":
                 renamer.PrintFileNames();
                 return 0;
 
-            case "-r":
-            case "-rr":
+            case "tv":
             {
-                if (rest.Count < 2)
+                var keep = rest.Remove("-k") | rest.Remove("--keep");
+                if (rest.Count < 1)
                 {
-                    Console.Error.WriteLine($"error: {cmd} requires a prefix");
+                    Console.Error.WriteLine("error: tv requires a prefix (e.g. tv \"Better Call Saul\" 1 1)");
                     return 1;
                 }
-                var prefix = rest[1];
-                var season = rest.Count > 2 ? int.Parse(rest[2]) : 1;
-                var episode = rest.Count > 3 ? int.Parse(rest[3]) : 1;
-                renamer.RenameTv(prefix, season, episode, keepOriginal: cmd == "-rr");
+                var prefix = rest[0];
+                var season = rest.Count > 1 ? int.Parse(rest[1]) : 1;
+                var episode = rest.Count > 2 ? int.Parse(rest[2]) : 1;
+                renamer.RenameTv(prefix, season, episode, keepOriginal: keep);
                 return 0;
             }
 
-            case "-m":
+            case "movie":
             {
-                if (rest.Count < 3)
+                if (rest.Count < 2)
                 {
-                    Console.Error.WriteLine("error: -m requires \"<title>\" <year>");
+                    Console.Error.WriteLine("error: movie requires \"<title>\" <year> (e.g. movie \"Apollo 13\" 1995)");
                     return 1;
                 }
-                if (!int.TryParse(rest[2], out var year))
+                if (!int.TryParse(rest[1], out var year))
                 {
-                    Console.Error.WriteLine($"error: invalid year '{rest[2]}'");
+                    Console.Error.WriteLine($"error: invalid year '{rest[1]}'");
                     return 1;
                 }
-                renamer.RenameMovie(rest[1], year);
+                renamer.RenameMovie(rest[0], year);
                 return 0;
             }
 
-            case "-remove":
-                if (rest.Count < 2)
+            case "strip":
+                if (rest.Count < 1)
                 {
-                    Console.Error.WriteLine("error: -remove requires at least one phrase");
+                    Console.Error.WriteLine("error: strip requires at least one phrase");
                     return 1;
                 }
-                renamer.RemoveStrings(rest.Skip(1));
+                renamer.RemoveStrings(rest);
                 return 0;
 
-            case "-addex":
-                if (rest.Count < 2)
+            case "addext":
+                if (rest.Count < 1)
                 {
-                    Console.Error.WriteLine("error: -addex requires an extension");
+                    Console.Error.WriteLine("error: addext requires an extension (e.g. addext .mkv)");
                     return 1;
                 }
-                renamer.AddExtension(rest[1]);
+                renamer.AddExtension(rest[0]);
                 return 0;
 
             default:
@@ -108,17 +114,28 @@ static void PrintUsage()
     Console.WriteLine("""
         RenamerUtil - batch file renamer for Plex-style names. Operates on the current directory (non-recursive).
 
-        Commands:
-          -t                                 List files in cwd, sorted (read-only).
-          -r  <prefix> [season] [episode]    TV: rename files to "<prefix> - sNNeNN<ext>".
-          -rr <prefix> [season] [episode]    TV: same, but keep scrubbed original name as suffix.
-          -m  "<title>" <year>               Movie: rename files to "<title> (<year>)<ext>".
-          -remove <phrase> [phrase ...]      Remove substring(s) from each filename.
-          -addex <.ext>                      Append extension to each file (include the dot).
+        Usage: RenamerUtil <command> [args] [flags]
 
-        Flags:
+        Commands:
+          list                              List files in cwd, sorted (read-only).
+          tv <prefix> [season] [episode]    Rename to "<prefix> - sNNeNN<ext>".
+                                            Add -k / --keep to retain the scrubbed
+                                            original name as a suffix.
+          movie "<title>" <year>            Rename to "<title> (<year>)<ext>".
+          strip <phrase> [phrase ...]       Remove substring(s) from each filename.
+          addext <.ext>                     Append extension to each file (include the dot).
+
+        Flags (apply to any command):
           -n, --dry-run    Print intended renames without touching files.
-          -h, --help       Show this message.
+          -h, --help       Show this help.
+
+        Examples:
+          RenamerUtil list
+          RenamerUtil tv "Better Call Saul" 1 1 --dry-run
+          RenamerUtil tv "Better Call Saul" 1 1 -k
+          RenamerUtil movie "Apollo 13" 1995
+          RenamerUtil strip "[BluRay]" " 1080p"
+          RenamerUtil addext .mkv
 
         Notes:
           - season and episode default to 1; episode increments per file (alphabetical order).

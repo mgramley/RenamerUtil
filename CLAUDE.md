@@ -25,24 +25,25 @@ A small cross-platform .NET 10 console exe (`RenamerUtil`) for batch-renaming fi
 
 All output (including from `PrintFileNames`) goes through an injectable `TextWriter` so tests can capture it; the CLI defaults to `Console.Out`.
 
-## CLI surface (`Program.cs`, top-level statements)
+## CLI surface (`Program.cs`, top-level statements, subcommand-style)
 
-| Flag | Behavior |
+Form: `RenamerUtil <command> [args] [flags]`. Flags are orthogonal — they can appear anywhere in argv and apply to whatever command is running.
+
+| Subcommand | Behavior |
 |---|---|
-| `-t` | List files in cwd, sorted (read-only). |
-| `-r <prefix> [season] [episode]` | TV: rename to `"<prefix> - sNNeNN<ext>"`, episode increments per file. |
-| `-rr <prefix> [season] [episode]` | Same as `-r` but appends the *scrubbed* original name as suffix. |
-| `-m "<title>" <year>` | Movie: rename to `"<title> (<year>)<ext>"`. |
-| `-remove <phrase> [phrase ...]` | Literal `string.Replace` of each phrase in every filename. Does **not** use the TV scrub lists. |
-| `-addex <.ext>` | Append extension to every file in cwd (caller supplies the dot). |
-| `-n` / `--dry-run` | Modifier — preview without touching files. |
-| `-h` / `--help` | Print usage. |
+| `list` | List files in cwd, sorted (read-only). |
+| `tv <prefix> [season] [episode]` | TV: rename to `"<prefix> - sNNeNN<ext>"`, episode increments per file. Add `-k` / `--keep` to retain the scrubbed original name as a suffix. |
+| `movie "<title>" <year>` | Movie: rename to `"<title> (<year>)<ext>"`. |
+| `strip <phrase> [phrase ...]` | Literal `string.Replace` of each phrase in every filename. Does **not** use the TV scrub lists. |
+| `addext <.ext>` | Append extension to every file in cwd (caller supplies the dot). |
+
+Global flags: `-n` / `--dry-run` (preview), `-h` / `--help` (usage). Unknown commands and missing required args print to stderr and exit 1.
 
 ## Key implementation detail: the TV scrub lists
 
-`Renamer.cs` has two static fields that drive how the *original* filename gets cleaned before it's used (in `-rr` mode as a suffix, and to remove the prefix from `-r`/`-rr` output):
+`Renamer.cs` has two static fields that drive how the *original* filename gets cleaned before it's used (in `tv --keep` mode as a suffix, and to remove the prefix from any `tv` output):
 
-- `BadChars` — string array of single-character substrings stripped via repeated `string.Replace`. Includes `0-9`, so any year/number in a source filename gets removed. This is the first place to look when `-rr` produces a wrong-looking suffix.
+- `BadChars` — string array of single-character substrings stripped via repeated `string.Replace`. Includes `0-9`, so any year/number in a source filename gets removed. This is the first place to look when `tv --keep` produces a wrong-looking suffix.
 - `BadStrings` — a single `Regex` matching `season`, `episode`, and the `480p` / `720p` / `1080p` / `2160p` resolution tags, optionally bracketed (`[1080p]`), case-insensitive. To add a new scrub token (e.g. `BluRay`, `WEB-DL`, `x264`), extend this regex's alternation.
 
 These only run inside `ScrubForTv` (called from `FormatTvName`). Movie mode (`FormatMovieName`) does no scrubbing — the user passes the title verbatim.
