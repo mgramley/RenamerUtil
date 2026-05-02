@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.30324.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenamerUtil", "RenamerUtil\RenamerUtil.csproj", "{058FFA29-0DF3-44B8-B914-E6DDA4AB9E0A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RenamerUtil.Tests", "RenamerUtil.Tests\RenamerUtil.Tests.csproj", "{006605A5-2957-4E4E-9759-0A11C86A96DF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{058FFA29-0DF3-44B8-B914-E6DDA4AB9E0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{058FFA29-0DF3-44B8-B914-E6DDA4AB9E0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{058FFA29-0DF3-44B8-B914-E6DDA4AB9E0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{006605A5-2957-4E4E-9759-0A11C86A96DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{006605A5-2957-4E4E-9759-0A11C86A96DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{006605A5-2957-4E4E-9759-0A11C86A96DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{006605A5-2957-4E4E-9759-0A11C86A96DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
