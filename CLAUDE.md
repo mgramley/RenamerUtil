@@ -4,35 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-project .NET Framework 4.5 C# console exe (`RenamerUtil.exe`) for batch-renaming files in a directory, originally written for organizing TV-show video files into `<show> - sNNeNN` form. There are no tests, no NuGet dependencies, no build scripts.
+A small cross-platform .NET 10 console exe (`RenamerUtil`) for batch-renaming files in a directory, used to turn blu-ray / DVD / 4K rip filenames into Plex-friendly TV (`Show - sNNeNN`) and movie (`Title (Year)`) names. Two projects: `RenamerUtil/` (the CLI) and `RenamerUtil.Tests/` (xunit + Shouldly + NSubstitute).
 
-## Build
+## Build & test
 
-The project uses the legacy (pre-SDK-style) `.csproj` format targeting `v4.5` of .NET Framework — it predates `dotnet build`.
+- `dotnet build` — builds both projects
+- `dotnet test` — runs the xunit suite (~40 tests, sub-second)
+- `dotnet run --project RenamerUtil -- <args>` — run the CLI without leaving the repo
+- The standalone binary lands at `RenamerUtil/bin/Debug/net10.0/RenamerUtil` and runs directly (a `runtimeconfig.json` is emitted alongside it)
+- For a single redistributable file: `dotnet publish RenamerUtil -c Release -r linux-x64 --self-contained`
 
-- Windows / Visual Studio: open `RenamerUtil.sln`, or `msbuild RenamerUtil.sln /p:Configuration=Debug` (or `Release`).
-- Linux: requires Mono's `msbuild` (`msbuild RenamerUtil.sln`). `dotnet build` will not work without first migrating the csproj to SDK style.
+## Runtime model (read this before changing rename logic)
 
-Build output lands in `RenamerUtil/bin/{Debug,Release}/RenamerUtil.exe`.
+`Renamer` always operates on the directory passed to its constructor — `Program.cs` passes `Directory.GetCurrentDirectory()`, tests pass a temp dir. Enumeration is non-recursive and sorted alphabetically by filename-without-extension. Every rename routes through `Renamer.Move`, which:
 
-## Runtime model
+1. Skips when the target name is empty/whitespace.
+2. Skips with `unchanged:` when source == target.
+3. Skips with `skip (target exists):` when the target file already exists — **the tool never overwrites**.
+4. Honours `dryRun` (passed via constructor / `-n` / `--dry-run`) by logging `DRY RUN:` instead of moving.
 
-The tool always operates on `Directory.GetCurrentDirectory()` — there is no path argument. Every command enumerates files in cwd (non-recursive) and **mutates them in place via `File.Move`**. There is no dry-run flag, so when iterating on rename logic, test in a throwaway directory.
+All output (including from `PrintFileNames`) goes through an injectable `TextWriter` so tests can capture it; the CLI defaults to `Console.Out`.
 
-## CLI surface (dispatched on `args[0]` in `Program.cs`)
+## CLI surface (`Program.cs`, top-level statements)
 
 | Flag | Behavior |
 |---|---|
-| `-t` | Print filenames in cwd, sorted by name-without-extension. Read-only. |
-| `-r <prefix> [season] [episode]` | Rename every file to `"<prefix> - sNNeNN<ext>"`, incrementing `episode` per file. Defaults: `season=1`, `episode=1`. |
-| `-rr <prefix> [season] [episode]` | Same as `-r`, but **keeps** the scrubbed original name as a suffix: `"<prefix> - sNNeNN - <scrubbed-original><ext>"`. |
-| `-remove <phrase> [phrase2 ...]` | Run `string.Replace(phrase, "")` over every filename for each phrase given. |
-| `-addex <ext>` | Append `<ext>` to every filename in cwd (no dot is added — pass `.mp4`, not `mp4`). |
+| `-t` | List files in cwd, sorted (read-only). |
+| `-r <prefix> [season] [episode]` | TV: rename to `"<prefix> - sNNeNN<ext>"`, episode increments per file. |
+| `-rr <prefix> [season] [episode]` | Same as `-r` but appends the *scrubbed* original name as suffix. |
+| `-m "<title>" <year>` | Movie: rename to `"<title> (<year>)<ext>"`. |
+| `-remove <phrase> [phrase ...]` | Literal `string.Replace` of each phrase in every filename. Does **not** use the TV scrub lists. |
+| `-addex <.ext>` | Append extension to every file in cwd (caller supplies the dot). |
+| `-n` / `--dry-run` | Modifier — preview without touching files. |
+| `-h` / `--help` | Print usage. |
 
-Anything else (including no args) is a no-op.
+## Key implementation detail: the TV scrub lists
 
-## Key implementation detail: the scrubbing lists
+`Renamer.cs` has two static fields that drive how the *original* filename gets cleaned before it's used (in `-rr` mode as a suffix, and to remove the prefix from `-r`/`-rr` output):
 
-`Renamer.cs` has two hardcoded `List<string>` fields — `_badChars` and `_badStrings` — that `FormatName` strips from the original filename before assembling the new name in `-r` / `-rr` mode. They drop digits, punctuation (including `.` and `-`), and resolution/season tokens like `1080p`, `Season`, `Episode`. This is why `-r` produces clean `s01e01` names from messy source filenames, and it's the first place to look when the rename output is wrong: any unwanted leftover comes from a missing entry in these lists, and any over-aggressive stripping comes from an entry that's too broad (e.g. stripping all digits means a show named "24" becomes empty).
+- `BadChars` — string array of single-character substrings stripped via repeated `string.Replace`. Includes `0-9`, so any year/number in a source filename gets removed. This is the first place to look when `-rr` produces a wrong-looking suffix.
+- `BadStrings` — a single `Regex` matching `season`, `episode`, and the `480p` / `720p` / `1080p` / `2160p` resolution tags, optionally bracketed (`[1080p]`), case-insensitive. To add a new scrub token (e.g. `BluRay`, `WEB-DL`, `x264`), extend this regex's alternation.
 
-`-remove` does **not** use these lists — it's literal `string.Replace` only.
+These only run inside `ScrubForTv` (called from `FormatTvName`). Movie mode (`FormatMovieName`) does no scrubbing — the user passes the title verbatim.
+
+`FormatTvName`, `FormatMovieName`, and `ScrubForTv` are intentionally `public static` so tests can exercise them directly without touching the filesystem.
